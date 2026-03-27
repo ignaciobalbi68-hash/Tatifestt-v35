@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Tatifestt · Final</title>
+  <!-- Enlace al manifiesto -->
+<link rel="manifest" href="manifest.json">
+<!-- Color de la barra de estado en móviles -->
+<meta name="theme-color" content="#5faec2">
+
+<script>
+  // Registro del Service Worker para habilitar la instalación
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log("Servicio de App Activo"))
+      .catch(err => console.log("Error al activar App", err));
+  }
+</script>
+
+  <!-- PWA MANIFEST -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="data:application/json;base64,ewogICJuYW1lIjogIlRhdGlmZXN0dCIsCiAgInNob3J0X25hbWUiOiAiVGF0aWZlc3R0IiwKICAic3RhcnRfdXJsIjogIi4iLAogICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLAogICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNlMGYyZmUiLAogICJ0aGVtZV9jb2xvciI6ICIjN2RkM2ZjIgp9">
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  
+  <style>
+    :root { 
+      --celeste: #7dd3fc; 
+      --celeste-icon: #bde9ff;
+      --bg-gradient: linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 100%);
+      --glass: rgba(255, 255, 255, 0.85); 
+      --text: #1e293b; 
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-gradient); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+    /* Iconos Flotantes de Fondo */
+    .bg-icon { position: fixed; pointer-events: none; z-index: 1; color: var(--celeste-icon); opacity: 0.5; animation: float 12s infinite ease-in-out; }
+    @keyframes float { 0%, 100% { transform: translate(0,0) rotate(0deg); } 50% { transform: translate(20px, -40px) rotate(10deg); } }
+
+    .main-title-wrap { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 35px 0; z-index: 10; position: relative; }
+    .side-icon { font-size: 1.8rem; color: #7dd3fc; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+    .main-title { font-size: 2.6rem; font-weight: 800; color: #334155; }
+
+    .screen { display: none; width: 100%; max-width: 450px; margin: 0 auto; padding: 20px; flex-direction: column; min-height: 100vh; position: relative; z-index: 10; }
+    .active { display: flex; }
+
+    .glass-card { background: var(--glass); backdrop-filter: blur(12px); border-radius: 35px; padding: 25px; width: 100%; border: 1px solid rgba(255,255,255,0.7); margin-bottom: 20px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.04); text-align: center; }
+    
+    .btn { background: white; color: var(--text); border: none; padding: 18px; border-radius: 25px; font-weight: 700; width: 100%; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); cursor: pointer; margin-bottom: 12px; transition: 0.2s; }
+    .btn:active { transform: scale(0.96); }
+    .btn-primary { background: var(--celeste); color: white; }
+    .btn-ai { background: #818cf8; color: white; }
+    .btn-danger { background: #ef4444; color: white; }
+
+    .reel { display: flex; gap: 12px; overflow-x: auto; width: 100%; padding: 10px 5px; scrollbar-width: none; }
+    .reel-thumb { width: 115px; height: 145px; border-radius: 20px; object-fit: cover; border: 4px solid white; flex-shrink: 0; box-shadow: 0 5px 12px rgba(0,0,0,0.1); }
+
+    /* Cámara DSLR Style */
+    .cam-layer { position: fixed; top:0; left:0; width:100%; height:100%; background:black; z-index: 9000; display:none; }
+    .video-full { width: 100%; height: 100%; object-fit: cover; }
+    #focusBrackets { position: absolute; width: 75px; height: 75px; border: 2px solid var(--celeste); border-radius: 12px; display: none; transform: translate(-50%, -50%); pointer-events: none; z-index: 9001; transition: 0.2s ease-out; }
+    #focusBrackets.focusing { width: 50px; height: 50px; border-color: white; border-width: 3px; }
+
+    .controls-side { position: absolute; right: 20px; top: 40%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 20px; background: rgba(0,0,0,0.4); padding: 20px 12px; border-radius: 30px; color: white; z-index: 9002; }
+    .controls-side input { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 8px; height: 120px; }
+    .flash-btn { position: absolute; top: 35px; left: 25px; color: white; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 50%; z-index: 9003; width: 55px; height: 55px; display: grid; place-items: center; }
+
+    /* Selfie XL */
+    .selfie-container { width: 92%; aspect-ratio: 1/1.3; border-radius: 45px; border: 6px solid #818cf8; overflow: hidden; margin: 25px auto; position: relative; box-shadow: 0 15px 40px rgba(129, 140, 248, 0.3); }
+
+    /* Admin Gallery */
+    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; padding-bottom: 180px; }
+    .admin-item { background: white; padding: 8px; border-radius: 18px; text-align: center; font-size: 0.8rem; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+
+    .viewer-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.98); z-index: 11000; display:none; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    .flash-fx { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index: 10000; display:none; }
+  </style>
+</head>
+<body>
+
+  <!-- Iconos Flotantes de Fondo -->
+  <i class="fas fa-ghost bg-icon" style="top:10%; left:10%; font-size: 4rem;"></i>
+  <i class="fas fa-bolt bg-icon" style="top:40%; right:5%; font-size: 3rem; color: #fbbf24;"></i>
+  <i class="fas fa-camera bg-icon" style="bottom:15%; left:5%; font-size: 5rem;"></i>
+  <i class="fas fa-star bg-icon" style="top:5%; right:20%; font-size: 2rem;"></i>
+
+  <div id="flashFx" class="flash-fx"></div>
+
+  <!-- Visor Full -->
+  <div id="viewer" class="viewer-overlay">
+      <img id="viewerImg" style="max-width:95%; max-height:75vh; border-radius:20px; box-shadow: 0 0 30px rgba(255,255,255,0.2);">
+      <div style="margin-top: 30px; display: flex; gap: 15px; width: 100%; max-width: 320px;">
+          <button class="btn btn-primary" onclick="downloadSingle()"><i class="fas fa-download"></i> GUARDAR</button>
+          <button class="btn btn-danger" onclick="closeViewer()">CERRAR</button>
+      </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="scrLogin" class="screen" style="justify-content: center;">
+    <div class="glass-card">
+      <h1 style="margin-bottom: 25px; font-size: 2.2rem;">Tatifestt</h1>
+      <input type="text" id="userName" placeholder="¿Quién eres?" style="width:100%; padding:22px; border-radius:22px; border:none; text-align: center; font-size: 1.1rem; background: #f1f5f9; outline:none; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);">
+      <button class="btn btn-primary" style="margin-top: 25px;" onclick="saveUser()">¡A CELEBRAR!</button>
+    </div>
+  </div>
+
+  <!-- MENU PRINCIPAL -->
+  <div id="scrMain" class="screen">
+    <div class="main-title-wrap">
+       <i class="fas fa-ghost side-icon"></i>
+       <h1 class="main-title">Tatifestt</h1>
+       <i class="fas fa-bolt side-icon" style="color:#fbbf24"></i>
+    </div>
+
+    <div class="glass-card" onclick="startCamera('environment')">
+      <div style="width:75px; height:75px; border:3px solid var(--celeste); border-radius:50%; display:grid; place-items:center; margin:0 auto 12px; background: white;">
+        <i class="fas fa-camera fa-xl" style="color:var(--celeste)"></i>
+      </div>
+      <p style="font-weight: 800; color: #475569; letter-spacing: 1px;">CÁMARA PRO</p>
+    </div>
+
+    <div class="glass-card" style="text-align: left;">
+      <p style="font-weight: 800; margin-bottom: 12px; color: #64748b; font-size: 0.9rem;">MIS FOTOS:</p>
+      <div id="reel" class="reel"></div>
+    </div>
+
+    <button class="btn" onclick="startCamera('user', true)">
+      <i class="fas fa-camera-retro"></i> MODO POLAROID
+    </button>
+
+    <button class="btn btn-ai" onclick="startSelfieIA()">
+      <i class="fas fa-magic"></i> SELFIE IA (VISOR XL)
+    </button>
+
+    <div style="margin-top: auto; padding-bottom: 25px; text-align:center;">
+        <div onclick="askAdmin()" style="font-size: 0.75rem; color: #94a3b8; letter-spacing: 3px; font-weight: bold; cursor: pointer; opacity: 0.6;">ADMINISTRACIÓN</div>
+    </div>
+  </div>
+
+  <!-- PANEL ADMIN -->
+  <div id="scrAdmin" class="screen">
+    <h2 style="margin: 20px 0; text-align: center;">Galería Máster</h2>
+    <div id="adminGrid" class="admin-grid"></div>
+    
+    <div style="position: fixed; bottom: 0; left:0; width: 100%; padding: 20px; background: white; border-radius: 30px 30px 0 0; box-shadow: 0 -8px 25px rgba(0,0,0,0.1); z-index: 100;">
+        <button class="btn btn-primary" onclick="downloadZip()"><i class="fas fa-file-archive"></i> DESCARGAR TODO</button>
+        <button class="btn btn-danger" onclick="clearFullGallery()"><i class="fas fa-trash-alt"></i> VACIAR GALERÍA</button>
+        <button class="btn" style="background:#f1f5f9" onclick="showScreen('scrMain')">VOLVER</button>
+    </div>
+  </div>
+
+  <!-- CÁMARA PRO -->
+  <div id="camLayer" class="cam-layer" onclick="triggerFocus(event)">
+    <div id="focusBrackets"></div>
+    <video id="videoMain" class="video-full" autoplay playsinline></video>
+    
+    <div class="flash-btn" onclick="toggleFlash(event)">
+        <i id="flashIcon" class="fas fa-bolt-slash"></i>
+    </div>
+
+    <div class="controls-side" onclick="event.stopPropagation()">
+        <i class="fas fa-sun"></i>
+        <input type="range" id="expRange" min="-2" max="2" step="0.1" value="0" oninput="applySettings()">
+        <i class="fas fa-search-plus"></i>
+        <input type="range" id="zoomRange" min="1" max="5" step="0.1" value="1" oninput="applySettings()">
+    </div>
+
+    <div style="position:absolute; bottom:55px; width:100%; display:flex; justify-content:space-evenly; align-items:center;">
+      <i class="fas fa-times fa-2x" style="color:white; opacity:0.8" onclick="stopCamera()"></i>
+      <div onclick="takePhoto(event)" style="width:90px; height:90px; background:white; border-radius:50%; border:12px solid rgba(255,255,255,0.3); box-shadow: 0 0 20px rgba(0,0,0,0.2);"></div>
+      <div style="width:40px;"></div>
+    </div>
+  </div>
+
+  <!-- SELFIE IA -->
+  <div id="selfieLayer" class="cam-layer" style="background: #eef2ff;">
+    <div class="selfie-container">
+        <video id="videoSelfie" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
+    </div>
+    <div style="padding: 0 40px; margin-top: 20px;">
+        <button class="btn btn-ai" onclick="captureSelfieIA()"><i class="fas fa-sparkles"></i> CAPTURAR MEJORADA</button>
+        <button class="btn btn-danger" onclick="stopCamera()">CANCELAR</button>
+    </div>
+  </div>
+
+  <!-- POLAROID -->
+  <div id="poloLayer" class="cam-layer" style="background: #e0f2fe; display:none; flex-direction: column; align-items: center; justify-content: center;">
+    <div style="background: white; padding: 15px 15px 65px 15px; width: 320px; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+      <div style="width: 100%; aspect-ratio: 1/1; background: #000; overflow: hidden;">
+        <video id="videoPolo" style="width:100%; height:100%; object-fit:cover;" autoplay playsinline></video>
+        <img id="poloImg" style="display:none; width:100%; height:100%; object-fit:cover;">
+      </div>
+      <div id="poloLabel" style="font-family: 'Brush Script MT', cursive; text-align:center; padding-top:20px; font-size: 2rem; color:#333;"></div>
+    </div>
+    <input type="text" id="poloInput" placeholder="Escribe un mensaje..." maxlength="18" style="width:320px; padding:18px; border-radius:18px; border:none; margin:20px 0; text-align:center; box-shadow: 0 5px 15px rgba(0,0,0,0.05);" oninput="document.getElementById('poloLabel').innerText = this.value">
+    <div style="display:flex; gap:10px; width:320px;">
+      <button id="btnPoloShot" class="btn btn-primary" onclick="capturePolo()">CAPTURAR</button>
+      <button id="btnPoloSend" class="btn" style="display:none; background:#22c55e; color:white;" onclick="sendPolo()">SUBIR</button>
+      <button class="btn btn-danger" onclick="stopCamera()">SALIR</button>
+    </div>
+  </div>
+
+  <script>
+    const CLOUD_NAME = "dfju7prsf", UPLOAD_PRESET = "foton_preset", BIN_ID = "69c32fd6aa77b81da917906c", API_KEY = "$2a$10$uy7R7FHC5Y0o5Clyh/XCxeICVQzkNtS58u6tOlML4Br6wfXHhc7Wq";
+    let stream = null, currentUser = localStorage.getItem('tatiUser'), currentViewImg = "", flashMode = 'off';
+
+    window.onload = () => { if (currentUser) { showScreen('scrMain'); loadReel(); } else { showScreen('scrLogin'); } };
+
+    function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+    function saveUser() { const n = document.getElementById('userName').value.trim(); if(n) { localStorage.setItem('tatiUser', n); currentUser = n; showScreen('scrMain'); loadReel(); } }
+
+    async function startCamera(mode, isPolo = false) {
+      if(stream) stopCamera();
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode } });
+        const track = stream.getVideoTracks()[0];
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+
+        if(caps.zoom) { const z = document.getElementById('zoomRange'); z.min = caps.zoom.min; z.max = caps.zoom.max; z.step = caps.zoom.step; z.value = 1; }
+        if(caps.exposureCompensation) { const e = document.getElementById('expRange'); e.min = caps.exposureCompensation.min; e.max = caps.exposureCompensation.max; e.step = caps.exposureCompensation.step; e.value = 0; }
+
+        if(isPolo) { document.getElementById('poloLayer').style.display = 'flex'; document.getElementById('videoPolo').srcObject = stream; } 
+        else { document.getElementById('camLayer').style.display = 'block'; document.getElementById('videoMain').srcObject = stream; setTimeout(()=>showFocus(window.innerWidth/2, window.innerHeight/2), 600); }
+      } catch(e) { alert("Permisos denegados."); }
+    }
+
+    async function startSelfieIA() {
+      if(stream) stopCamera();
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        document.getElementById('selfieLayer').style.display = 'block';
+        document.getElementById('videoSelfie').srcObject = stream;
+      } catch(e) { alert("Error frontal."); }
+    }
+
+    function toggleFlash(e) {
+      e.stopPropagation();
+      const track = stream.getVideoTracks()[0];
+      if(!track.getCapabilities().torch) return alert("Flash no disponible.");
+      flashMode = (flashMode === 'off') ? 'torch' : 'off';
+      track.applyConstraints({ advanced: [{ torch: (flashMode === 'torch') }] });
+      document.getElementById('flashIcon').className = (flashMode === 'torch') ? 'fas fa-bolt' : 'fas fa-bolt-slash';
+    }
+
+    function triggerFocus(e) { showFocus(e.clientX, e.clientY); }
+    function showFocus(x, y) {
+      const b = document.getElementById('focusBrackets'); b.style.left = x + 'px'; b.style.top = y + 'px';
+      b.style.display = 'block'; b.classList.add('focusing');
+      setTimeout(() => { b.classList.remove('focusing'); setTimeout(() => b.style.display = 'none', 300); }, 500);
+    }
+
+    function applySettings() {
+      const track = stream.getVideoTracks()[0];
+      const s = {};
+      if(track.getCapabilities().zoom) s.zoom = document.getElementById('zoomRange').value;
+      if(track.getCapabilities().exposureCompensation) s.exposureCompensation = document.getElementById('expRange').value;
+      track.applyConstraints({ advanced: [s] });
+    }
+
+    function takePhoto(e) {
+      e.stopPropagation();
+      const fx = document.getElementById('flashFx'); fx.style.display = 'block'; setTimeout(() => fx.style.display = 'none', 80);
+      const v = document.getElementById('videoMain'), c = document.createElement('canvas');
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext('2d').drawImage(v, 0, 0);
+      c.toBlob(b => uploadImage(b), 'image/jpeg', 0.85);
+    }
+
+    function captureSelfieIA() {
+      const v = document.getElementById('videoSelfie'), c = document.createElement('canvas');
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      const ctx = c.getContext('2d');
+      ctx.filter = "brightness(1.05) contrast(1.1) saturate(1.1)";
+      ctx.drawImage(v, 0, 0);
+      c.toBlob(b => uploadImage(b), 'image/jpeg', 0.9);
+      stopCamera();
+    }
+
+    function capturePolo() {
+      const v = document.getElementById('videoPolo'), c = document.createElement('canvas'), s = Math.min(v.videoWidth, v.videoHeight);
+      c.width = 800; c.height = 800;
+      c.getContext('2d').drawImage(v, (v.videoWidth-s)/2, (v.videoHeight-s)/2, s, s, 0, 0, 800, 800);
+      document.getElementById('poloImg').src = c.toDataURL('image/jpeg');
+      document.getElementById('poloImg').style.display = 'block'; v.style.display = 'none';
+      document.getElementById('btnPoloShot').style.display = 'none'; document.getElementById('btnPoloSend').style.display = 'block';
+    }
+
+    async function sendPolo() {
+      const fc = document.createElement('canvas'); fc.width = 800; fc.height = 1050; const ctx = fc.getContext('2d');
+      ctx.fillStyle = "white"; ctx.fillRect(0,0,800,1050); ctx.drawImage(document.getElementById('poloImg'), 40, 40, 720, 720);
+      ctx.fillStyle = "#222"; ctx.font = "italic 40px 'Brush Script MT', cursive"; ctx.textAlign = "center";
+      ctx.fillText(document.getElementById('poloInput').value, 400, 935);
+      fc.toBlob(b => uploadImage(b), 'image/jpeg', 0.85); stopCamera();
+    }
+
+    async function uploadImage(blob) {
+      const fd = new FormData(); fd.append('file', blob); fd.append('upload_preset', UPLOAD_PRESET);
+      try {
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+        const data = await res.json();
+        const binRes = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+        const binData = await binRes.json();
+        let list = binData.record.recuerdos || [];
+        list.unshift({ url: data.secure_url, user: currentUser, id: Date.now() });
+        await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify({ recuerdos: list }) });
+        loadReel();
+      } catch (e) { alert("Error subiendo foto."); }
+    }
+
+    async function loadReel() {
+      try {
+        const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+        const data = await res.json();
+        const my = data.record.recuerdos.filter(p => p.user === currentUser).slice(0, 5);
+        const box = document.getElementById('reel'); box.innerHTML = my.length ? '' : '<p style="color:#94a3b8">¡Captura el momento!</p>';
+        my.forEach(p => { 
+          const img = document.createElement('img'); img.src = p.url; img.className = 'reel-thumb';
+          img.onclick = () => { currentViewImg = p.url; document.getElementById('viewerImg').src = p.url; document.getElementById('viewer').style.display = 'flex'; };
+          box.appendChild(img); 
+        });
+      } catch(e) {}
+    }
+
+    /* ADMIN */
+    function askAdmin() { if(prompt("Contraseña:") === "tati2026") { showScreen('scrAdmin'); loadAdminGallery(); } }
+
+    async function loadAdminGallery() {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+      const data = await res.json();
+      const g = document.getElementById('adminGrid'); g.innerHTML = '';
+      data.record.recuerdos.forEach((p, i) => {
+        const d = document.createElement('div'); d.className = 'admin-item';
+        d.innerHTML = `<img src="${p.url}" style="width:100%; border-radius:12px;"><p style="margin:5px 0"><b>${p.user}</b></p><button onclick="deletePhoto(${i})" style="color:red;border:none;background:none;font-size:0.7rem;">ELIMINAR</button>`;
+        g.appendChild(d);
+      });
+    }
+
+    async function deletePhoto(i) {
+      if(!confirm("¿Eliminar esta foto?")) return;
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+      const data = await res.json(); data.record.recuerdos.splice(i, 1);
+      await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify(data.record) });
+      loadAdminGallery();
+    }
+
+    async function clearFullGallery() {
+      if(confirm("¡ATENCIÓN! Se borrarán TODAS las fotos de la fiesta. ¿Estás seguro?")) {
+        if(confirm("¿Segurísimo? Esta acción no se puede deshacer.")) {
+          await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY }, body: JSON.stringify({ recuerdos: [] }) });
+          loadAdminGallery();
+        }
+      }
+    }
+
+    async function downloadZip() {
+      const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+      const data = await res.json(); const zip = new JSZip();
+      const pms = data.record.recuerdos.map(async (p, i) => { try { const r = await fetch(p.url); const b = await r.blob(); zip.file(`Tatifestt_${i}_${p.user}.jpg`, b); } catch(e){} });
+      await Promise.all(pms); zip.generateAsync({type:"blob"}).then(c => saveAs(c, "Fotos_Tatifestt_2026.zip"));
+    }
+
+    function closeViewer() { document.getElementById('viewer').style.display = 'none'; }
+    function downloadSingle() { saveAs(currentViewImg, "Tatifestt_Foto.jpg"); }
+    function stopCamera() { if(stream) stream.getTracks().forEach(t => t.stop()); document.querySelectorAll('.cam-layer').forEach(l => l.style.display = 'none'); }
+  </script>
+</body>
+</html>
